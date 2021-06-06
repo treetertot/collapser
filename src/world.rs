@@ -20,7 +20,7 @@ impl<S: Superposition> TileWorld<S> {
             superimposed: TagList(Vec::new()),
         }
     }
-    fn find(&self, addr: (i32, i32)) -> Collapseable<&S::Tile, &S> {
+    pub fn read(&self, addr: (i32, i32)) -> Collapseable<&S::Tile, &S> {
         match self.collapsed.bin_search(&addr) {
             Ok(i) => Collapseable::Collapsed(&self.collapsed.0[i].data),
             Err(_) => match self.superimposed.bin_search(&addr) {
@@ -40,10 +40,10 @@ impl<S: Superposition> TileWorld<S> {
     }
     fn neighbors(&self, (x, y): (i32, i32)) -> Neighbors<Collapseable<&S::Tile, &S>> {
         Neighbors {
-            top: self.find((x, y + 1)),
-            bottom: self.find((x, y - 1)),
-            left: self.find((x - 1, y)),
-            right: self.find((x + 1, y)),
+            top: self.read((x, y + 1)),
+            bottom: self.read((x, y - 1)),
+            left: self.read((x - 1, y)),
+            right: self.read((x + 1, y)),
         }
     }
     fn center_ns(
