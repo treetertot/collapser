@@ -61,8 +61,10 @@ impl<S: Superposition> TileWorld<S> {
         }
     }
     pub fn set_active(&mut self, allocated: [Range<i32>; 2]) {
-        self.allocated = allocated;
-        self.refine();
+        if self.allocated != allocated {
+            self.allocated = allocated;
+            self.refine();
+        }
     }
     // returns the changed
     fn refine_cycle<I: IntoIterator<Item = (i32, i32)>>(&mut self, to_check: I) -> Vec<(i32, i32)> {
