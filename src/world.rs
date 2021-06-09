@@ -1,7 +1,7 @@
 use crate::cell::{Side, Working};
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Tagged<T>(Vec<((i32, i32), T)>);
 impl<T> Tagged<T> {
     fn search(&self, x: i32, y: i32) -> Result<usize, usize> {
@@ -28,7 +28,7 @@ fn tag_test() {
     assert_eq!(tagged.get(0, 1), Some(&1))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Twolayer<P, S> {
     primary: Tagged<P>,
     secondary: Tagged<S>,
@@ -86,7 +86,7 @@ impl Bounding {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct World<W: Working> {
     rules: W::Rules,
     base: W,
@@ -125,11 +125,16 @@ impl<W: Working> World<W> {
     /// Changes the bounding and updates the newly awakened tiles
     pub fn set_bounding(&mut self, bounding: Range<[i32; 2]>) {
         if bounding != self.bounding.0 {
-        let old_iter = self.bounding.clone();
-        self.bounding = Bounding(bounding);
-        let iter = self.bounding.cells().filter(|&(x, y)| !old_iter.contains(x, y));
+            let old_iter = self.bounding.clone();
+            self.bounding = Bounding(bounding);
+            let iter = self
+                .bounding
+                .cells()
+                .filter(|&(x, y)| !old_iter.contains(x, y));
             for (x, y) in iter {
-                self.refine(x, y);
+                if self.has_neighbors(x, y) {
+                    self.refine(x, y);
+                }
             }
         }
     }
@@ -178,6 +183,13 @@ impl<W: Working> World<W> {
             self.refine(x + 1, y);
             self.refine(x - 1, y);
         }
+    }
+    fn has_neighbors(&self, x: i32, y: i32) -> bool {
+        // fix so if only some are none, it behaves like
+        self.tiles.get(x, y + 1).is_some()
+            || self.tiles.get(x, y - 1).is_some()
+            || self.tiles.get(x + 1, y).is_some()
+            || self.tiles.get(x - 1, y).is_some()
     }
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))
