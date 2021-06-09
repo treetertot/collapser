@@ -1,5 +1,6 @@
 # collapser
 
-Collapser is not fast or ergonomic. This is a simple driver for wfc-like generation algorithims that allows interacting with the result before it has generated.
+Collapser is not fast or ergonomic.
+It is a simple library for custom wfc-like generation algorithims that allows reading the result as it generates.
 
 I should probably rename it to progressive-collapse.
