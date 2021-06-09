@@ -128,10 +128,10 @@ impl<S: Superposition> TileWorld<S> {
         }
     }
     fn contains(&self, addr: (i32, i32)) -> bool {
-        self.allocated[0].start < addr.0
-            && addr.0 < self.allocated[0].end
-            && self.allocated[1].start < addr.1
-            && addr.1 < self.allocated[1].end
+        self.allocated[0].start <= addr.0
+            && addr.0 <= self.allocated[0].end
+            && self.allocated[1].start <= addr.1
+            && addr.1 <= self.allocated[1].end
     }
     /// returns true if reduction sucessful
     pub fn reduce(&mut self, addr: (i32, i32)) -> bool {
