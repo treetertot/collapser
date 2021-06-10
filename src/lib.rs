@@ -13,7 +13,6 @@ mod tests {
             }
         }
         assert_ne!(world.read(0, 0), world.read(0, 1));
-        println!("{:?}", world)
     }
 }
 

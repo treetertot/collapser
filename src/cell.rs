@@ -1,9 +1,4 @@
-pub enum Side {
-    Top,
-    Bottom,
-    Left,
-    Right,
-}
+use crate::world::World;
 
 pub trait Working: Sized + Clone {
     type Tile;
@@ -13,8 +8,9 @@ pub trait Working: Sized + Clone {
     fn refine(
         &mut self,
         rules: &Self::Rules,
-        side: Side,
-        neighbor: Result<&Self::Tile, &Self>,
+        x: i32,
+        y: i32,
+        world: &World<Self>,
     ) -> Result<Self::Tile, bool>;
     /// Collapses the tile to a random value
     fn force_collapse(&self) -> Self::Tile;

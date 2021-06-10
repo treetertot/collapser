@@ -1,4 +1,4 @@
-use crate::cell::{Side, Working};
+use crate::cell::Working;
 use std::ops::Range;
 
 #[derive(Debug, Clone)]
@@ -122,6 +122,29 @@ impl<W: Working> World<W> {
         self.refine(x + 1, y);
         self.refine(x - 1, y);
     }
+    fn refine(&mut self, x: i32, y: i32) {
+        if !self.bounding.contains(x, y) {
+            return;
+        }
+        let mut tile = match self.read(x, y) {
+            Ok(_) => return,
+            Err(t) => t.clone(),
+        };
+        let change = match tile.refine(&self.rules, x, y, self) {
+            Ok(t) => {
+                self.tiles.insert_p(x, y, t);
+                false
+            }
+            Err(change) => change,
+        };
+        if change {
+            self.tiles.insert_s(x, y, tile);
+            self.refine(x, y + 1);
+            self.refine(x, y - 1);
+            self.refine(x + 1, y);
+            self.refine(x - 1, y);
+        }
+    }
     /// Changes the bounding and updates the newly awakened tiles
     pub fn set_bounding(&mut self, bounding: Range<[i32; 2]>) {
         if bounding != self.bounding.0 {
@@ -132,64 +155,9 @@ impl<W: Working> World<W> {
                 .cells()
                 .filter(|&(x, y)| !old_iter.contains(x, y));
             for (x, y) in iter {
-                if self.has_neighbors(x, y) {
-                    self.refine(x, y);
-                }
+                self.refine(x, y);
             }
         }
-    }
-    fn refine(&mut self, x: i32, y: i32) {
-        if !self.bounding.contains(x, y) {
-            return;
-        }
-        let mut tile = match self.tiles.get(x, y) {
-            Some(Err(t)) => t.clone(),
-            None => self.base.clone(),
-            _ => return,
-        };
-        let mut change = false;
-        match tile.refine(&self.rules, Side::Top, self.read(x, y + 1)) {
-            Ok(t) => {
-                self.tiles.insert_p(x, y, t);
-                change = true;
-            }
-            Err(diff) => change = change || diff,
-        }
-        match tile.refine(&self.rules, Side::Bottom, self.read(x, y - 1)) {
-            Ok(t) => {
-                self.tiles.insert_p(x, y, t);
-                change = true;
-            }
-            Err(diff) => change = change || diff,
-        }
-        match tile.refine(&self.rules, Side::Right, self.read(x + 1, y)) {
-            Ok(t) => {
-                self.tiles.insert_p(x, y, t);
-                change = true;
-            }
-            Err(diff) => change = change || diff,
-        }
-        match tile.refine(&self.rules, Side::Left, self.read(x - 1, y)) {
-            Ok(t) => {
-                self.tiles.insert_p(x, y, t);
-                change = true;
-            }
-            Err(diff) => change = change || diff,
-        }
-        if change {
-            self.tiles.insert_s(x, y, tile);
-            self.refine(x, y + 1);
-            self.refine(x, y - 1);
-            self.refine(x + 1, y);
-            self.refine(x - 1, y);
-        }
-    }
-    fn has_neighbors(&self, x: i32, y: i32) -> bool {
-        // fix so if only some are none, it behaves like
-        self.tiles.get(x, y + 1).is_some()
-            || self.tiles.get(x, y - 1).is_some()
-            || self.tiles.get(x + 1, y).is_some()
-            || self.tiles.get(x - 1, y).is_some()
     }
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))

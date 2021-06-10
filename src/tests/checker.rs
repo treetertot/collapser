@@ -1,4 +1,4 @@
-use crate::cell::{Side, Working};
+use crate::{cell::Working, world::World};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Possible([bool; 2]);
@@ -12,13 +12,23 @@ impl Working for Possible {
     fn refine(
         &mut self,
         _rules: &Self::Rules,
-        _side: Side,
-        neighbor: Result<&Self::Tile, &Self>,
+        x: i32,
+        y: i32,
+        world: &World<Self>,
     ) -> Result<Self::Tile, bool> {
-        let change = match neighbor {
-            Ok(val) => std::mem::replace(&mut self.0[*val as usize], false),
-            Err(_) => false,
-        };
+        let neighbors = [
+            world.read(x, y + 1),
+            world.read(x, y - 1),
+            world.read(x + 1, y),
+            world.read(x - 1, y),
+        ];
+        if neighbors.iter().all(|n| n.is_err()) {
+            return Err(false);
+        }
+        let mut change = false;
+        for &neighbor in neighbors.iter().filter_map(|r| r.ok()) {
+            change = change || std::mem::replace(&mut self.0[neighbor as usize], false);
+        }
         let count = self.0.iter().filter(|v| **v).count();
         match count {
             0 => Ok(0),
