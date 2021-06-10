@@ -13,6 +13,8 @@ mod tests {
             }
         }
         assert_ne!(world.read(0, 0), world.read(0, 1));
+        assert_eq!(world.read(0, 0), Ok(&0));
+        assert_eq!(world.read(0, 1), Ok(&1));
     }
 }
 

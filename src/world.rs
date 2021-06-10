@@ -126,19 +126,22 @@ impl<W: Working> World<W> {
         if !self.bounding.contains(x, y) {
             return;
         }
-        let mut tile = match self.read(x, y) {
+        let res = match self.read(x, y) {
             Ok(_) => return,
-            Err(t) => t.clone(),
+            Err(w) => w.refine(x, y, &self.rules, self),
         };
-        let change = match tile.refine(&self.rules, x, y, self) {
+        let change = match res {
             Ok(t) => {
                 self.tiles.insert_p(x, y, t);
-                false
+                true
             }
-            Err(change) => change,
+            Err(Some(w)) => {
+                self.tiles.insert_s(x, y, w);
+                true
+            }
+            Err(None) => false,
         };
         if change {
-            self.tiles.insert_s(x, y, tile);
             self.refine(x, y + 1);
             self.refine(x, y - 1);
             self.refine(x + 1, y);
@@ -158,6 +161,9 @@ impl<W: Working> World<W> {
                 self.refine(x, y);
             }
         }
+    }
+    pub fn base(&self) -> &W {
+        &self.base
     }
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))

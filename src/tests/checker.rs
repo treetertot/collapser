@@ -10,30 +10,30 @@ impl Working for Possible {
         Possible([true; 2])
     }
     fn refine(
-        &mut self,
-        _rules: &Self::Rules,
+        &self,
         x: i32,
         y: i32,
+        _rules: &Self::Rules,
         world: &World<Self>,
-    ) -> Result<Self::Tile, bool> {
+    ) -> Result<Self::Tile, Option<Self>> {
         let neighbors = [
             world.read(x, y + 1),
             world.read(x, y - 1),
             world.read(x + 1, y),
             world.read(x - 1, y),
         ];
-        if neighbors.iter().all(|n| n.is_err()) {
-            return Err(false);
+        if neighbors.iter().all(|r| r.is_err()) {
+            return Err(None);
         }
         let mut change = false;
-        for &neighbor in neighbors.iter().filter_map(|r| r.ok()) {
-            change = change || std::mem::replace(&mut self.0[neighbor as usize], false);
+        let mut me = self.clone();
+        let iter = neighbors.iter().filter_map(|r| r.ok());
+        for &i in iter {
+            change = change || std::mem::replace(&mut me.0[i as usize], false);
         }
-        let count = self.0.iter().filter(|v| **v).count();
-        match count {
-            0 => Ok(0),
-            1 => Ok(self.force_collapse()),
-            _ => Err(change),
+        match change {
+            true => Err(Some(me)),
+            false => Err(None),
         }
     }
     fn force_collapse(&self) -> Self::Tile {
