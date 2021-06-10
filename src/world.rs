@@ -165,6 +165,9 @@ impl<W: Working> World<W> {
     pub fn base(&self) -> &W {
         &self.base
     }
+    pub fn try_read(&self, x: i32, y: i32) -> Option<Result<&W::Tile, &W>> {
+        self.tiles.get(x, y)
+    }
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))
     }
