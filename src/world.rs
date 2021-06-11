@@ -1,5 +1,8 @@
-use crate::cell::{Working, Grabber};
+use crate::cell::Working;
 use std::{borrow::Borrow, ops::Range};
+use std::mem::MaybeUninit;
+use std::mem::forget;
+
 
 #[derive(Debug, Clone)]
 struct Tagged<T>(Vec<((i32, i32), T)>);
@@ -123,7 +126,7 @@ impl<W: Working<N>, const N: usize> World<W, N> {
         if !self.bounding.contains(x, y) {
             return;
         }
-        let neighbors = match W::NEIGHBORS.grab(x, y, self) {
+        let neighbors = match grab(W::NEIGHBORS, x, y, self) {
             Some(ns) => ns,
             None => return
         };
@@ -176,4 +179,37 @@ impl<W: Working<N>, const N: usize> World<W, N> {
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))
     }
+}
+
+fn grab<'a, W: Working<N>, const N: usize>(grabber: [(i32, i32); N], x: i32, y: i32, world: &'a World<W, N>) -> Option<[Result<&'a W::Tile, &'a W>; N]> {
+    let mut try_grab: [Option<Result<&W::Tile, &W>>; N] = none_array();
+    for ((x, y), dest) in grabber.iter().map(|&(a, b)| (x+a, y+b)).zip(&mut try_grab) {
+        *dest = world.try_read(x, y);
+    }
+    if try_grab.iter().all(|o| o.is_none()) {
+        return None;
+    }
+    let base = world.base();
+    Some(arr_map(try_grab, |o| o.unwrap_or(Err(base))))
+}
+
+fn none_array<T, const N: usize>() -> [Option<T>; N] {
+    let mut unin: MaybeUninit<[Option<T>; N]> = MaybeUninit::uninit();
+    let ptr = unin.as_mut_ptr() as *mut Option<T>;
+    for i in 0..N {
+        unsafe{ptr.add(i).write(None)}
+    }
+    unsafe{unin.assume_init()}
+}
+
+fn arr_map<A, B, F: FnMut(A) -> B, const N: usize>(a: [A; N], mut f: F) -> [B; N] {
+    let mut b = MaybeUninit::uninit();
+    let ptr = b.as_mut_ptr() as *mut B;
+    for (i, aitem) in a.iter().enumerate() {
+        let aptr = aitem as *const A;
+        let bptr = unsafe{ptr.add(i)};
+        unsafe{bptr.write(f(aptr.read()))};
+    }
+    forget(a);
+    unsafe{b.assume_init()}
 }

@@ -5,9 +5,8 @@ pub struct Possible([bool; 2]);
 impl Working<4> for Possible {
     type Tile = u8;
     type Rules = ();
-    type Grabber = [(i32, i32); 4];
 
-    const NEIGHBORS: Self::Grabber = [(-1, 0), (0, -1), (0, 1), (1, 0)];
+    const NEIGHBORS: [(i32, i32); 4] = [(-1, 0), (0, -1), (0, 1), (1, 0)];
 
     fn new(_rules: &Self::Rules) -> Self {
         Possible([true; 2])
