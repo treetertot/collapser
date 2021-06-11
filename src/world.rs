@@ -1,5 +1,5 @@
-use crate::cell::Working;
-use std::ops::Range;
+use crate::cell::{Working, Grabber};
+use std::{borrow::Borrow, ops::Range};
 
 #[derive(Debug, Clone)]
 struct Tagged<T>(Vec<((i32, i32), T)>);
@@ -87,13 +87,13 @@ impl Bounding {
 }
 
 #[derive(Debug, Clone)]
-pub struct World<W: Working> {
+pub struct World<W: Working<N>, const N: usize> {
     rules: W::Rules,
     base: W,
     tiles: Twolayer<W::Tile, W>,
     bounding: Bounding,
 }
-impl<W: Working> World<W> {
+impl<W: Working<N>, const N: usize> World<W, N> {
     /// Bounding limits which tiles will be actively updated
     pub fn new(rules: W::Rules, bounding: Range<[i32; 2]>) -> Self {
         let base = W::new(&rules);
@@ -117,35 +117,33 @@ impl<W: Working> World<W> {
             _ => return,
         };
         self.tiles.insert_p(x, y, tile);
-        self.refine(x, y + 1);
-        self.refine(x, y - 1);
-        self.refine(x + 1, y);
-        self.refine(x - 1, y);
+        self.propagate(x, y)
     }
     fn refine(&mut self, x: i32, y: i32) {
         if !self.bounding.contains(x, y) {
             return;
         }
-        let res = match self.read(x, y) {
-            Ok(_) => return,
-            Err(w) => w.refine(x, y, &self.rules, self),
+        let neighbors = match W::NEIGHBORS.grab(x, y, self) {
+            Some(ns) => ns,
+            None => return
         };
-        let change = match res {
+        let mut tile = match self.read(x, y) {
+            Ok(_) => return,
+            Err(w) => w.clone(),
+        };
+        let change = match tile.refine(neighbors, &self.rules) {
             Ok(t) => {
                 self.tiles.insert_p(x, y, t);
                 true
             }
-            Err(Some(w)) => {
-                self.tiles.insert_s(x, y, w);
+            Err(true) => {
+                self.tiles.insert_s(x, y, tile);
                 true
             }
-            Err(None) => false,
+            Err(false) => false
         };
         if change {
-            self.refine(x, y + 1);
-            self.refine(x, y - 1);
-            self.refine(x + 1, y);
-            self.refine(x - 1, y);
+            self.propagate(x, y);
         }
     }
     /// Changes the bounding and updates the newly awakened tiles
@@ -162,10 +160,17 @@ impl<W: Working> World<W> {
             }
         }
     }
+    fn propagate(&mut self, x: i32, y: i32) {
+        let ns = W::NEIGHBORS;
+        let slc: &[_] = ns.borrow();
+        for (x, y) in slc.iter().map(|(a, b)| (a + x, b + y)) {
+            self.refine(x, y);
+        }
+    }
     pub fn base(&self) -> &W {
         &self.base
     }
-    pub fn try_read(&self, x: i32, y: i32) -> Option<Result<&W::Tile, &W>> {
+    pub(crate) fn try_read(&self, x: i32, y: i32) -> Option<Result<&W::Tile, &W>> {
         self.tiles.get(x, y)
     }
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {

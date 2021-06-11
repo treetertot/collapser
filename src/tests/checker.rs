@@ -1,39 +1,26 @@
-use crate::{cell::Working, world::World};
+use crate::cell::Working;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Possible([bool; 2]);
-impl Working for Possible {
+impl Working<4> for Possible {
     type Tile = u8;
     type Rules = ();
+    type Grabber = [(i32, i32); 4];
+
+    const NEIGHBORS: Self::Grabber = [(-1, 0), (0, -1), (0, 1), (1, 0)];
 
     fn new(_rules: &Self::Rules) -> Self {
         Possible([true; 2])
     }
-    fn refine(
-        &self,
-        x: i32,
-        y: i32,
-        _rules: &Self::Rules,
-        world: &World<Self>,
-    ) -> Result<Self::Tile, Option<Self>> {
-        let neighbors = [
-            world.read(x, y + 1),
-            world.read(x, y - 1),
-            world.read(x + 1, y),
-            world.read(x - 1, y),
-        ];
-        if neighbors.iter().all(|r| r.is_err()) {
-            return Err(None);
-        }
+    fn refine(&mut self, neighbors: [Result<&Self::Tile, &Self>; 4], _rules: &Self::Rules) -> Result<Self::Tile, bool> {
         let mut change = false;
-        let mut me = self.clone();
-        let iter = neighbors.iter().filter_map(|r| r.ok());
-        for &i in iter {
-            change = change || std::mem::replace(&mut me.0[i as usize], false);
+        for &val in neighbors.iter().filter_map(|r| r.ok()) {
+            change = change || std::mem::replace(&mut self.0[val as usize], false);
         }
-        match change {
-            true => Err(Some(me)),
-            false => Err(None),
+        let iter = self.0.iter().filter(|b| **b);
+        match iter.count() {
+            0 | 1 => Ok(self.force_collapse()),
+            _ => Err(change)
         }
     }
     fn force_collapse(&self) -> Self::Tile {
@@ -43,6 +30,6 @@ impl Working for Possible {
             .filter(|(_i, v)| **v)
             .map(|(i, _)| i as u8)
             .next()
-            .unwrap_or(3)
+            .unwrap_or(2)
     }
 }
