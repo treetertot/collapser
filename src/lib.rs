@@ -17,6 +17,8 @@ mod tests {
         assert_eq!(world.read(0, 1), Ok(&1));
     }
 }
-
+///Collapser is a library for writing custom tile generators similar to WFC.
+/// The library focuses on the Working trait. To see how to implement it, I reccomend looking at the checker test.
+/// (You'll need to go to the github for that).
 pub mod cell;
 pub mod world;
