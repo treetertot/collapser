@@ -2,16 +2,17 @@ use crate::cell::Working;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Possible([bool; 2]);
-impl Working<4> for Possible {
+impl Working for Possible {
     type Tile = u8;
     type Rules = ();
+    type Grabber = [(i32, i32); 4];
 
-    const NEIGHBORS: [(i32, i32); 4] = [(-1, 0), (0, -1), (0, 1), (1, 0)];
+    const NEIGHBORS: Self::Grabber = [(-1, 0), (0, -1), (0, 1), (1, 0)];
 
     fn new(_rules: &Self::Rules) -> Self {
         Possible([true; 2])
     }
-    fn refine(&mut self, neighbors: [Result<&Self::Tile, &Self>; 4], _rules: &Self::Rules) -> Result<Self::Tile, bool> {
+    fn refine(&mut self, neighbors: &[Result<&Self::Tile, &Self>], _rules: &Self::Rules) -> Result<Self::Tile, bool> {
         let mut change = false;
         for &val in neighbors.iter().filter_map(|r| r.ok()) {
             change = change || std::mem::replace(&mut self.0[val as usize], false);

@@ -6,7 +6,7 @@ mod tests {
     #[test]
     fn checkertest() {
         let size = 10;
-        let mut world: World<Possible, 4> = World::new((), [0, 0]..[size, size]);
+        let mut world: World<Possible> = World::new((), [0, 0]..[size, size]);
         for i in 0..size {
             for j in 0..size {
                 world.collapse(i, j);

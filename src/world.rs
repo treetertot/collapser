@@ -90,13 +90,15 @@ impl Bounding {
 }
 
 #[derive(Debug, Clone)]
-pub struct World<W: Working<N>, const N: usize> {
+pub struct World<W: Working> {
     rules: W::Rules,
     base: W,
     tiles: Twolayer<W::Tile, W>,
     bounding: Bounding,
 }
-impl<W: Working<N>, const N: usize> World<W, N> {
+impl<W, const N: usize> World<W> where
+W: Working<Grabber=[(i32, i32); N]>,
+{
     /// Bounding limits which tiles will be actively updated
     pub fn new(rules: W::Rules, bounding: Range<[i32; 2]>) -> Self {
         let base = W::new(&rules);
@@ -126,7 +128,7 @@ impl<W: Working<N>, const N: usize> World<W, N> {
         if !self.bounding.contains(x, y) {
             return;
         }
-        let neighbors = match grab(W::NEIGHBORS, x, y, self) {
+        let neighbors = match self.grab(W::NEIGHBORS, x, y) {
             Some(ns) => ns,
             None => return
         };
@@ -134,7 +136,7 @@ impl<W: Working<N>, const N: usize> World<W, N> {
             Ok(_) => return,
             Err(w) => w.clone(),
         };
-        let change = match tile.refine(neighbors, &self.rules) {
+        let change = match tile.refine(&neighbors, &self.rules) {
             Ok(t) => {
                 self.tiles.insert_p(x, y, t);
                 true
@@ -179,18 +181,17 @@ impl<W: Working<N>, const N: usize> World<W, N> {
     pub fn read(&self, x: i32, y: i32) -> Result<&W::Tile, &W> {
         self.tiles.get(x, y).unwrap_or(Err(&self.base))
     }
-}
-
-fn grab<'a, W: Working<N>, const N: usize>(grabber: [(i32, i32); N], x: i32, y: i32, world: &'a World<W, N>) -> Option<[Result<&'a W::Tile, &'a W>; N]> {
-    let mut try_grab: [Option<Result<&W::Tile, &W>>; N] = none_array();
-    for ((x, y), dest) in grabber.iter().map(|&(a, b)| (x+a, y+b)).zip(&mut try_grab) {
-        *dest = world.try_read(x, y);
+    fn grab(&self, grabber: [(i32, i32); N], x: i32, y: i32) -> Option<[Result<&W::Tile, &W>; N]> {
+        let mut try_grab: [Option<Result<&W::Tile, &W>>; N] = none_array();
+        for ((x, y), dest) in grabber.iter().map(|&(a, b)| (x+a, y+b)).zip(&mut try_grab) {
+            *dest = self.try_read(x, y);
+        }
+        if try_grab.iter().all(|o| o.is_none()) {
+            return None;
+        }
+        let base = self.base();
+        Some(arr_map(try_grab, |o| o.unwrap_or(Err(base))))
     }
-    if try_grab.iter().all(|o| o.is_none()) {
-        return None;
-    }
-    let base = world.base();
-    Some(arr_map(try_grab, |o| o.unwrap_or(Err(base))))
 }
 
 fn none_array<T, const N: usize>() -> [Option<T>; N] {
