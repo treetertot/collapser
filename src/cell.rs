@@ -18,7 +18,7 @@ pub trait Working: Sized + Clone {
     fn refine(
         &mut self,
         neighbors: &[Result<&Self::Tile, &Self>],
-        rules: &Self::Rules
+        rules: &Self::Rules,
     ) -> Result<Self::Tile, bool>;
     /// Collapses the tile to a random value
     fn force_collapse(&self) -> Self::Tile;

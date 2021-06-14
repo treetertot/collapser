@@ -12,7 +12,11 @@ impl Working for Possible {
     fn new(_rules: &Self::Rules) -> Self {
         Possible([true; 2])
     }
-    fn refine(&mut self, neighbors: &[Result<&Self::Tile, &Self>], _rules: &Self::Rules) -> Result<Self::Tile, bool> {
+    fn refine(
+        &mut self,
+        neighbors: &[Result<&Self::Tile, &Self>],
+        _rules: &Self::Rules,
+    ) -> Result<Self::Tile, bool> {
         let mut change = false;
         for &val in neighbors.iter().filter_map(|r| r.ok()) {
             change = change || std::mem::replace(&mut self.0[val as usize], false);
@@ -20,7 +24,7 @@ impl Working for Possible {
         let iter = self.0.iter().filter(|b| **b);
         match iter.count() {
             0 | 1 => Ok(self.force_collapse()),
-            _ => Err(change)
+            _ => Err(change),
         }
     }
     fn force_collapse(&self) -> Self::Tile {

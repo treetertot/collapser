@@ -1,8 +1,10 @@
 use crate::cell::Working;
-use std::{borrow::Borrow, ops::Range};
-use std::mem::MaybeUninit;
 use std::mem::forget;
+use std::mem::MaybeUninit;
+use std::{borrow::Borrow, ops::Range};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 struct Tagged<T>(Vec<((i32, i32), T)>);
@@ -88,6 +90,13 @@ impl Bounding {
             .flatten()
     }
 }
+#[cfg(feature = "serde")]
+#[derive(Debug, Deserialize, Serialize)]
+pub struct WorldSave<W, T, R> {
+    pub rules: R,
+    pub cells: Vec<((i32, i32), Result<T, W>)>,
+    pub bounding: Range<[i32; 2]>
+}
 
 #[derive(Debug, Clone)]
 pub struct World<W: Working> {
@@ -96,8 +105,9 @@ pub struct World<W: Working> {
     tiles: Twolayer<W::Tile, W>,
     bounding: Bounding,
 }
-impl<W, const N: usize> World<W> where
-W: Working<Grabber=[(i32, i32); N]>,
+impl<W, const N: usize> World<W>
+where
+    W: Working<Grabber = [(i32, i32); N]>,
 {
     /// Bounding limits which tiles will be actively updated
     pub fn new(rules: W::Rules, bounding: Range<[i32; 2]>) -> Self {
@@ -130,7 +140,7 @@ W: Working<Grabber=[(i32, i32); N]>,
         }
         let neighbors = match self.grab(W::NEIGHBORS, x, y) {
             Some(ns) => ns,
-            None => return
+            None => return,
         };
         let mut tile = match self.read(x, y) {
             Ok(_) => return,
@@ -145,7 +155,7 @@ W: Working<Grabber=[(i32, i32); N]>,
                 self.tiles.insert_s(x, y, tile);
                 true
             }
-            Err(false) => false
+            Err(false) => false,
         };
         if change {
             self.propagate(x, y);
@@ -183,7 +193,11 @@ W: Working<Grabber=[(i32, i32); N]>,
     }
     fn grab(&self, grabber: [(i32, i32); N], x: i32, y: i32) -> Option<[Result<&W::Tile, &W>; N]> {
         let mut try_grab: [Option<Result<&W::Tile, &W>>; N] = none_array();
-        for ((x, y), dest) in grabber.iter().map(|&(a, b)| (x+a, y+b)).zip(&mut try_grab) {
+        for ((x, y), dest) in grabber
+            .iter()
+            .map(|&(a, b)| (x + a, y + b))
+            .zip(&mut try_grab)
+        {
             *dest = self.try_read(x, y);
         }
         if try_grab.iter().all(|o| o.is_none()) {
@@ -194,13 +208,63 @@ W: Working<Grabber=[(i32, i32); N]>,
     }
 }
 
+#[cfg(feature = "serde")]
+impl<W: Working> World<W> {
+    pub fn get_save(&self) -> WorldSave<W, W::Tile, W::Rules>
+    where
+        W::Tile: Clone,
+        W::Rules: Clone,
+    {
+        WorldSave {
+            rules: self.rules.clone(),
+            cells: self
+                .tiles
+                .primary
+                .0
+                .iter()
+                .map(|((x, y), t)| ((*x, *y), Ok(t.clone())))
+                .chain(
+                    self.tiles
+                        .secondary
+                        .0
+                        .iter()
+                        .map(|((x, y), w)| ((*x, *y), Err(w.clone()))),
+                )
+                .collect(),
+            bounding: self.bounding.0.clone()
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<W: Working> From<WorldSave<W, W::Tile, W::Rules>> for World<W> {
+    fn from(save: WorldSave<W, W::Tile, W::Rules>) -> Self {
+        let mut tiles = Twolayer::new();
+        let rules = save.rules;
+        for ((x, y), tile) in save.cells {
+            match tile {
+                Ok(t) => tiles.insert_p(x, y, t),
+                Err(w) => tiles.insert_s(x, y, w)
+            }
+        }
+        let bounding = Bounding(save.bounding);
+        let base = W::new(&rules);
+        Self {
+            tiles,
+            rules,
+            bounding,
+            base
+        }
+    }
+}
+
 fn none_array<T, const N: usize>() -> [Option<T>; N] {
     let mut unin: MaybeUninit<[Option<T>; N]> = MaybeUninit::uninit();
     let ptr = unin.as_mut_ptr() as *mut Option<T>;
     for i in 0..N {
-        unsafe{ptr.add(i).write(None)}
+        unsafe { ptr.add(i).write(None) }
     }
-    unsafe{unin.assume_init()}
+    unsafe { unin.assume_init() }
 }
 
 fn arr_map<A, B, F: FnMut(A) -> B, const N: usize>(a: [A; N], mut f: F) -> [B; N] {
@@ -208,9 +272,9 @@ fn arr_map<A, B, F: FnMut(A) -> B, const N: usize>(a: [A; N], mut f: F) -> [B; N
     let ptr = b.as_mut_ptr() as *mut B;
     for (i, aitem) in a.iter().enumerate() {
         let aptr = aitem as *const A;
-        let bptr = unsafe{ptr.add(i)};
-        unsafe{bptr.write(f(aptr.read()))};
+        let bptr = unsafe { ptr.add(i) };
+        unsafe { bptr.write(f(aptr.read())) };
     }
     forget(a);
-    unsafe{b.assume_init()}
+    unsafe { b.assume_init() }
 }
